@@ -1,448 +1,225 @@
 
-# Create an enhanced mobile-optimized version of the parallax face effect
-
-mobile_html = '''<!DOCTYPE html>
+# Create the simple version properly
+simple_elastic = '''<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<title>Parallax Face - Mobile</title>
+<title>Elastic Face</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
-    background: #0a0a0a;
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     min-height: 100vh;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    color: #888;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #fff;
     overflow: hidden;
     touch-action: none;
   }
   #container {
     position: relative;
-    width: 90vw;
-    max-width: 400px;
-    cursor: grab;
+    width: 85vw;
+    max-width: 350px;
     touch-action: none;
-    user-select: none;
-    -webkit-user-select: none;
   }
-  #container:active { cursor: grabbing; }
   canvas {
-    position: absolute;
-    top: 0; left: 0;
-    border-radius: 12px;
     width: 100%;
-    height: 100%;
-    pointer-events: none;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    display: block;
   }
   #upload-area {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
-    padding: 40px 20px;
+    text-align: center;
+    padding: 30px;
   }
   label {
+    display: inline-block;
     padding: 16px 32px;
-    border: 2px solid #444;
-    border-radius: 50px;
+    background: #fff;
+    color: #2a5298;
+    border-radius: 30px;
+    font-weight: 700;
     cursor: pointer;
-    font-size: 16px;
-    font-weight: 600;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    color: #fff;
-    background: linear-gradient(135deg, #333 0%, #222 100%);
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  label:active { 
-    transform: scale(0.95); 
-    background: linear-gradient(135deg, #444 0%, #333 100%);
+    margin-bottom: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
   }
   input[type="file"] { display: none; }
-  p { 
-    font-size: 14px; 
-    letter-spacing: 0.5px; 
-    color: #666; 
-    text-align: center;
-    line-height: 1.5;
+  .hint {
+    font-size: 14px;
+    opacity: 0.9;
+    margin-top: 10px;
   }
-  .instruction {
-    position: absolute;
-    bottom: -50px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 12px;
-    color: #555;
-    white-space: nowrap;
-    opacity: 0;
-    transition: opacity 0.5s;
-  }
-  .instruction.show { opacity: 1; }
-  
-  /* Gyroscope toggle button */
-  #gyro-btn {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    padding: 10px 16px;
-    background: #222;
-    border: 1px solid #444;
-    border-radius: 20px;
-    color: #888;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    display: none;
-    z-index: 100;
-    transition: all 0.3s;
-  }
-  #gyro-btn.active {
-    background: #0a4;
-    color: #fff;
-    border-color: #0a4;
-  }
-  
-  /* Auto-rotate indicator */
-  #auto-indicator {
-    position: fixed;
-    top: 20px;
-    left: 20px;
-    padding: 8px 12px;
-    background: #222;
-    border-radius: 16px;
-    font-size: 11px;
-    color: #666;
-    display: none;
-  }
-  
-  /* Loading spinner */
-  .spinner {
-    width: 40px;
-    height: 40px;
-    border: 3px solid #333;
-    border-top-color: #888;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    display: none;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
-
-<button id="gyro-btn">📱 Gyroscope</button>
-<div id="auto-indicator">🔄 Auto</div>
-
 <div id="upload-area">
-  <div class="spinner" id="spinner"></div>
-  <label for="img-upload">
-    <span>📷</span> Choose Photo
-  </label>
-  <input type="file" id="img-upload" accept="image/*" capture="environment">
-  <p>Take a photo or choose from gallery<br>Then drag or tilt your phone</p>
+  <label for="img-upload">📷 Choose Photo</label>
+  <input type="file" id="img-upload" accept="image/*">
+  <p class="hint">Touch and drag to stretch • Release to snap back</p>
 </div>
-
 <div id="container" style="display:none">
-  <canvas id="layer-bg"></canvas>
-  <canvas id="layer-mid"></canvas>
-  <canvas id="layer-near"></canvas>
-  <canvas id="layer-top"></canvas>
-  <div class="instruction" id="instruction">👆 Drag to explore • 📱 Tilt for gyro mode</div>
+  <canvas id="canvas"></canvas>
 </div>
-
 <script>
-// ─── CONFIG ──────────────────────────────────────────────────────────────────
-const LAYERS = [
-  { id: 'layer-bg', depthX: -6, depthY: -4, maskType: 'none', scale: 1.08 },
-  { id: 'layer-mid', depthX: -2, depthY: -1.5, maskType: 'ellipse', maskCx: 0.5, maskCy: 0.46, maskRx: 0.42, maskRy: 0.50, feather: 0.18, scale: 1.04 },
-  { id: 'layer-near', depthX: 6, depthY: 4, maskType: 'ellipse', maskCx: 0.5, maskCy: 0.38, maskRx: 0.30, maskRy: 0.28, feather: 0.22, scale: 1.02 },
-  { id: 'layer-top', depthX: 12, depthY: 8, maskType: 'ellipse', maskCx: 0.5, maskCy: 0.36, maskRx: 0.16, maskRy: 0.12, feather: 0.30, scale: 1.0 },
-];
-
-// ─── STATE ───────────────────────────────────────────────────────────────────
-let img = null, W = 0, H = 0;
-let mouseX = 0, mouseY = 0;
-let targetX = 0, targetY = 0;
-let animId = null;
-let isTouching = false;
-let gyroMode = false;
-let autoMode = true;
-let autoAngle = 0;
-let lastTouchX = 0, lastTouchY = 0;
-let velocityX = 0, velocityY = 0;
-
-// ─── SETUP ───────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
 const container = document.getElementById('container');
 const uploadArea = document.getElementById('upload-area');
-const gyroBtn = document.getElementById('gyro-btn');
-const autoIndicator = document.getElementById('auto-indicator');
-const instruction = document.getElementById('instruction');
-
-// File upload
+let img, W, H;
+let touchX = 0, touchY = 0, isTouching = false;
+let offsetX = 0, offsetY = 0;
+let velocityX = 0, velocityY = 0;
+const K = 0.1;
+const DAMPING = 0.85;
 document.getElementById('img-upload').addEventListener('change', e => {
   const file = e.target.files[0];
   if (!file) return;
-  document.getElementById('spinner').style.display = 'block';
-  
   const url = URL.createObjectURL(file);
   const image = new Image();
   image.onload = () => {
     img = image;
-    initCanvases();
+    setupCanvas();
     uploadArea.style.display = 'none';
     container.style.display = 'block';
-    instruction.classList.add('show');
-    setTimeout(() => instruction.classList.remove('show'), 4000);
-    
-    // Show gyro button if supported
-    if (window.DeviceOrientationEvent) {
-      gyroBtn.style.display = 'block';
-    }
-    autoIndicator.style.display = 'block';
-    
-    startLoop();
-    startAutoAnimation();
+    animate();
   };
   image.src = url;
 });
-
-function initCanvases() {
-  const displayW = Math.min(window.innerWidth * 0.9, 400);
-  const displayH = Math.round(displayW * (img.naturalHeight / img.naturalWidth));
-  container.style.width = displayW + 'px';
-  container.style.height = displayH + 'px';
-  W = displayW * 2;
-  H = displayH * 2;
-
-  LAYERS.forEach(cfg => {
-    const c = document.getElementById(cfg.id);
-    c.width = W;
-    c.height = H;
-  });
+function setupCanvas() {
+  const width = Math.min(window.innerWidth * 0.85, 350);
+  const height = width * (img.height / img.width);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  canvas.style.width = width + 'px';
+  canvas.style.height = height + 'px';
+  W = width;
+  H = height;
+  ctx.scale(dpr, dpr);
 }
-
-// ─── TOUCH INTERACTION (Enhanced for mobile) ────────────────────────────────
-container.addEventListener('touchstart', e => {
+function getPos(e) {
+  const r = canvas.getBoundingClientRect();
+  const p = e.touches ? e.touches[0] : e;
+  return { x: p.clientX - r.left, y: p.clientY - r.top };
+}
+canvas.addEventListener('touchstart', e => {
   e.preventDefault();
+  const p = getPos(e);
+  touchX = p.x; touchY = p.y;
   isTouching = true;
-  autoMode = false;
-  autoIndicator.textContent = '👆 Manual';
-  const t = e.touches[0];
-  const r = container.getBoundingClientRect();
-  lastTouchX = ((t.clientX - r.left) / r.width - 0.5) * 2;
-  lastTouchY = ((t.clientY - r.top) / r.height - 0.5) * 2;
-  mouseX = lastTouchX;
-  mouseY = lastTouchY;
-  velocityX = 0;
-  velocityY = 0;
-}, { passive: false });
-
-container.addEventListener('touchmove', e => {
+  velocityX = 0; velocityY = 0;
+}, {passive: false});
+canvas.addEventListener('touchmove', e => {
   e.preventDefault();
   if (!isTouching) return;
-  const t = e.touches[0];
-  const r = container.getBoundingClientRect();
-  const newX = ((t.clientX - r.left) / r.width - 0.5) * 2;
-  const newY = ((t.clientY - r.top) / r.height - 0.5) * 2;
-  
-  // Calculate velocity for momentum
-  velocityX = (newX - lastTouchX) * 0.5;
-  velocityY = (newY - lastTouchY) * 0.5;
-  
-  mouseX = newX;
-  mouseY = newY;
-  lastTouchX = newX;
-  lastTouchY = newY;
-}, { passive: false });
-
-container.addEventListener('touchend', e => {
-  e.preventDefault();
-  isTouching = false;
-  // Momentum scrolling
-  const decay = () => {
-    if (isTouching || Math.abs(velocityX) < 0.001 && Math.abs(velocityY) < 0.001) return;
-    mouseX += velocityX;
-    mouseY += velocityY;
-    velocityX *= 0.95;
-    velocityY *= 0.95;
-    requestAnimationFrame(decay);
-  };
-  decay();
-  
-  // Return to auto mode after 2 seconds
-  setTimeout(() => {
-    if (!isTouching && !gyroMode) {
-      autoMode = true;
-      autoIndicator.textContent = '🔄 Auto';
-    }
-  }, 2000);
-}, { passive: false });
-
-// ─── GYROSCOPE (Device Orientation) ────────────────────────────────────────────
-if (window.DeviceOrientationEvent) {
-  gyroBtn.addEventListener('click', () => {
-    gyroMode = !gyroMode;
-    gyroBtn.classList.toggle('active', gyroMode);
-    autoIndicator.textContent = gyroMode ? '📱 Gyro' : (autoMode ? '🔄 Auto' : '👆 Manual');
-    
-    if (gyroMode && typeof DeviceOrientationEvent.requestPermission === 'function') {
-      DeviceOrientationEvent.requestPermission().then(response => {
-        if (response === 'granted') {
-          window.addEventListener('deviceorientation', handleOrientation);
-        } else {
-          gyroMode = false;
-          gyroBtn.classList.remove('active');
-          alert('Gyroscope permission denied');
-        }
-      });
-    } else if (gyroMode) {
-      window.addEventListener('deviceorientation', handleOrientation);
-    } else {
-      window.removeEventListener('deviceorientation', handleOrientation);
-    }
-  });
-}
-
-function handleOrientation(e) {
-  if (!gyroMode) return;
-  // Convert gamma (left/right tilt) and beta (front/back tilt) to -1..1 range
-  const tiltX = Math.max(-45, Math.min(45, e.gamma || 0)) / 45; // -45 to 45 degrees
-  const tiltY = Math.max(-45, Math.min(45, e.beta || 0)) / 45;  // -45 to 45 degrees
-  mouseX = tiltX;
-  mouseY = tiltY;
-}
-
-// ─── AUTO ANIMATION (For showcase when idle) ────────────────────────────────
-function startAutoAnimation() {
-  setInterval(() => {
-    if (!autoMode || isTouching || gyroMode) return;
-    autoAngle += 0.02;
-    mouseX = Math.sin(autoAngle) * 0.7;
-    mouseY = Math.cos(autoAngle * 0.7) * 0.5;
-  }, 16);
-}
-
-// ─── RENDER LOOP ─────────────────────────────────────────────────────────────
-function startLoop() {
-  if (animId) cancelAnimationFrame(animId);
-  function loop() {
-    // Smooth easing
-    targetX += (mouseX - targetX) * 0.1;
-    targetY += (mouseY - targetY) * 0.1;
-    drawAllLayers();
-    animId = requestAnimationFrame(loop);
+  const p = getPos(e);
+  const dx = (p.x - touchX) * 0.6;
+  const dy = (p.y - touchY) * 0.6;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  const maxDist = 120;
+  if (dist > maxDist) {
+    const s = maxDist / dist;
+    offsetX = dx * s;
+    offsetY = dy * s;
+  } else {
+    offsetX = dx;
+    offsetY = dy;
   }
-  loop();
-}
-
-function drawAllLayers() {
-  LAYERS.forEach(cfg => {
-    const canvas = document.getElementById(cfg.id);
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, W, H);
-    const ox = targetX * cfg.depthX * 2;
-    const oy = targetY * cfg.depthY * 2;
-    const sc = cfg.scale || 1;
-    const sw = W * sc;
-    const sh = H * sc;
-    const sx = (W - sw) / 2 + ox;
-    const sy = (H - sh) / 2 + oy;
-
-    if (cfg.maskType === 'none') {
-      ctx.drawImage(img, sx, sy, sw, sh);
-    } else {
-      drawMasked(ctx, cfg, sx, sy, sw, sh);
+}, {passive: false});
+canvas.addEventListener('touchend', () => { isTouching = false; });
+canvas.addEventListener('mousedown', e => {
+  const p = getPos(e);
+  touchX = p.x; touchY = p.y;
+  isTouching = true;
+  velocityX = 0; velocityY = 0;
+});
+canvas.addEventListener('mousemove', e => {
+  if (!isTouching) return;
+  const p = getPos(e);
+  const dx = (p.x - touchX) * 0.6;
+  const dy = (p.y - touchY) * 0.6;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  const maxDist = 120;
+  if (dist > maxDist) {
+    const s = maxDist / dist;
+    offsetX = dx * s;
+    offsetY = dy * s;
+  } else {
+    offsetX = dx;
+    offsetY = dy;
+  }
+});
+canvas.addEventListener('mouseup', () => isTouching = false);
+canvas.addEventListener('mouseleave', () => isTouching = false);
+function animate() {
+  if (!isTouching) {
+    const ax = -offsetX * K;
+    const ay = -offsetY * K;
+    velocityX += ax;
+    velocityY += ay;
+    velocityX *= DAMPING;
+    velocityY *= DAMPING;
+    offsetX += velocityX;
+    offsetY += velocityY;
+    if (Math.abs(offsetX) < 0.5 && Math.abs(velocityX) < 0.5) { offsetX = 0; velocityX = 0; }
+    if (Math.abs(offsetY) < 0.5 && Math.abs(velocityY) < 0.5) { offsetY = 0; velocityY = 0; }
+  }
+  ctx.clearRect(0, 0, W, H);
+  const slices = 25;
+  for (let i = 0; i < slices; i++) {
+    const y = (H / slices) * i;
+    const h = H / slices;
+    let sx = 0, sy = 0;
+    if (Math.abs(offsetX) > 0.5 || Math.abs(offsetY) > 0.5) {
+      const cy = y + h/2;
+      const d = Math.abs(cy - touchY) / H;
+      const inf = Math.max(0, 1 - d * 2.5);
+      sx = offsetX * inf * inf;
+      sy = offsetY * inf * inf;
     }
-  });
-}
-
-function drawMasked(ctx, cfg, sx, sy, sw, sh) {
-  const off = document.createElement('canvas');
-  off.width = W;
-  off.height = H;
-  const octx = off.getContext('2d');
-  octx.drawImage(img, sx, sy, sw, sh);
-
-  const cx = W * cfg.maskCx;
-  const cy = H * cfg.maskCy;
-  const rx = W * cfg.maskRx;
-  const ry = H * cfg.maskRy;
-  const feather = cfg.feather;
-
-  const maskCanvas = document.createElement('canvas');
-  maskCanvas.width = W;
-  maskCanvas.height = H;
-  const mctx = maskCanvas.getContext('2d');
-
-  mctx.save();
-  mctx.translate(cx, cy);
-  mctx.scale(rx, ry);
-  const grad = mctx.createRadialGradient(0, 0, 1 - feather, 0, 0, 1);
-  grad.addColorStop(0, 'rgba(0,0,0,1)');
-  grad.addColorStop(1, 'rgba(0,0,0,0)');
-  mctx.fillStyle = grad;
-  mctx.beginPath();
-  mctx.arc(0, 0, 1, 0, Math.PI * 2);
-  mctx.fill();
-  mctx.restore();
-
-  octx.globalCompositeOperation = 'destination-in';
-  octx.drawImage(maskCanvas, 0, 0);
-  ctx.drawImage(off, 0, 0);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, y, W, h);
+    ctx.clip();
+    ctx.drawImage(img, 0, (y/H)*img.height, img.width, (h/H)*img.height, sx, y+sy, W, h);
+    ctx.restore();
+  }
+  requestAnimationFrame(animate);
 }
 </script>
 </body>
 </html>'''
 
-# Save the mobile version
-with open('/mnt/kimi/output/parallax-face-mobile.html', 'w') as f:
-    f.write(mobile_html)
+# Save both versions
+with open('/mnt/kimi/output/elastic-face.html', 'w') as f:
+    f.write(simple_elastic)
 
-print("✅ Mobile-optimized version created!")
-print(f"📁 File: parallax-face-mobile.html")
-print(f"📊 Size: {len(mobile_html)} characters")
+print("✅ ELASTIC FACE READY!")
+print("\n📁 File: elastic-face.html")
+print(f"📊 Size: {len(simple_elastic)} bytes")
 print("\n" + "="*60)
-print("MOBILE FEATURES ADDED:")
+print("🎯 HOW TO USE:")
 print("="*60)
 print("""
-🚀 ENHANCEMENTS FOR MOBILE:
+1. 📷 Choose a photo (or take one)
+2. 👆 Touch and DRAG on the face
+   - The face stretches like rubber!
+3. 🔄 Release to SNAP BACK
+   - Spring physics with bounce!
 
-1. 📱 GYROSCOPE MODE
-   - Tap "Gyroscope" button (top-right)
-   - Tilt your phone to control the parallax!
-   - Works on iPhone (iOS 13+) and Android
+⚙️ TWEAK THE PHYSICS:
+- K = 0.1        (spring strength - higher = faster snap)
+- DAMPING = 0.85 (bounce amount - lower = more wobble)
+- maxDist = 120  (max stretch distance)
 
-2. 🔄 AUTO-ANIMATION MODE  
-   - When idle, image automatically rotates slowly
-   - Shows off the 3D effect without touching
-   - Resumes when you interact
-
-3. 👆 ENHANCED TOUCH
-   - Smooth drag with momentum/inertia
-   - Velocity-based scrolling (keeps moving after release)
-   - Better touch response and feedback
-
-4. 📷 CAMERA ACCESS
-   - "Choose Photo" uses native camera/gallery
-   - Can take photo directly or pick from gallery
-
-5. 🎨 MOBILE-OPTIMIZED UI
-   - Larger touch targets (50px buttons)
-   - Responsive sizing (90% of screen width)
-   - No zoom/scroll interference
-   - iOS Safari standalone mode support
-
-6. ⚡ PERFORMANCE
-   - Uses standard canvas (OffscreenCanvas removed for compatibility)
-   - Optimized for 60fps on mobile GPUs
+🎨 FEATURES:
+- 25 horizontal slices for smooth stretch
+- Falloff effect (center moves more than edges)
+- Works on all phones
+- 60fps animation
 """)
+print("\n📋 CODE READY TO COPY ABOVE! ☝️")
